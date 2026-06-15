@@ -64,6 +64,14 @@ import com.example.aonime.theme.TextPrimary
 import com.example.aonime.theme.TextSecondary
 import com.example.aonime.theme.Violet
 import com.example.aonime.theme.VioletLight
+import com.example.aonime.theme.BorderColor
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.TextButton
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -99,12 +107,19 @@ fun DetailScreen(
                 )
             }
             is DetailUiState.Success -> {
+                val selectedRange by viewModel.selectedRange.collectAsStateWithLifecycle()
+                val isEpisodesLoading by viewModel.isEpisodesLoading.collectAsStateWithLifecycle()
+
                 DetailContent(
                     detail = state.detail,
                     episodes = state.episodes,
+                    totalEpisodes = state.totalEpisodes,
+                    selectedRange = selectedRange,
+                    isEpisodesLoading = isEpisodesLoading,
                     isFavorite = isFavorite,
                     onToggleFavorite = { viewModel.toggleFavorite(slug, state.detail) },
                     onPlayEpisode = { ep -> onPlayEpisode(slug, ep) },
+                    onRangeSelected = { start, end -> viewModel.setEpisodeRange(slug, start, end) },
                 )
             }
         }
@@ -124,10 +139,28 @@ fun DetailScreen(
 private fun DetailContent(
     detail: AnimeDetail,
     episodes: List<Episode>,
+    totalEpisodes: Int,
+    selectedRange: Pair<String?, String?>,
+    isEpisodesLoading: Boolean,
     isFavorite: Boolean,
     onToggleFavorite: () -> Unit,
     onPlayEpisode: (String) -> Unit,
+    onRangeSelected: (String?, String?) -> Unit,
 ) {
+    var showCustomRangeDialog by remember { mutableStateOf(false) }
+
+    if (showCustomRangeDialog) {
+        CustomEpisodeRangeDialog(
+            initialStart = selectedRange.first ?: "",
+            initialEnd = selectedRange.second ?: "",
+            onDismissRequest = { showCustomRangeDialog = false },
+            onApply = { start, end ->
+                onRangeSelected(start, end)
+                showCustomRangeDialog = false
+            }
+        )
+    }
+
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         // Hero banner
         item {
@@ -256,7 +289,7 @@ private fun DetailContent(
 
                 // Episode section header
                 Text(
-                    "Episodes (${episodes.size})",
+                    "Episodes (${totalEpisodes})",
                     color = TextPrimary,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
@@ -265,12 +298,48 @@ private fun DetailContent(
             }
         }
 
+        if (totalEpisodes > 50) {
+            item {
+                EpisodeRangeFilterRow(
+                    totalEpisodes = totalEpisodes,
+                    selectedRange = selectedRange,
+                    onRangeSelected = onRangeSelected,
+                    onCustomRangeClick = { showCustomRangeDialog = true }
+                )
+                Spacer(Modifier.height(12.dp))
+            }
+        }
+
         // Episode list
-        items(episodes) { episode ->
-            EpisodeItem(
-                episode = episode,
-                onClick = { episode.number?.let { onPlayEpisode(it) } },
-            )
+        if (isEpisodesLoading) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = Violet)
+                }
+            }
+        } else if (episodes.isEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No episodes found", color = TextSecondary, fontSize = 14.sp)
+                }
+            }
+        } else {
+            items(episodes) { episode ->
+                EpisodeItem(
+                    episode = episode,
+                    onClick = { episode.number?.let { onPlayEpisode(it) } },
+                )
+            }
         }
 
         item { Spacer(Modifier.height(32.dp)) }
@@ -347,5 +416,212 @@ private fun EpisodeItem(
         }
 
         Icon(Icons.Rounded.PlayArrow, contentDescription = null, tint = TextMuted, modifier = Modifier.size(18.dp))
+    }
+}
+
+@Composable
+fun CustomEpisodeRangeDialog(
+    initialStart: String,
+    initialEnd: String,
+    onDismissRequest: () -> Unit,
+    onApply: (start: String, end: String) -> Unit
+) {
+    var startEp by remember { mutableStateOf(initialStart) }
+    var endEp by remember { mutableStateOf(initialEnd) }
+
+    Dialog(
+        onDismissRequest = onDismissRequest,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(32.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .width(320.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(CardSurface)
+                    .border(1.dp, BorderColor, RoundedCornerShape(16.dp))
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    "Custom Episode Range",
+                    color = TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = startEp,
+                    onValueChange = { startEp = it.filter { char -> char.isDigit() } },
+                    label = { Text("Start Episode", color = TextSecondary) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        focusedBorderColor = Violet,
+                        unfocusedBorderColor = BorderColor,
+                        cursorColor = Violet
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = endEp,
+                    onValueChange = { endEp = it.filter { char -> char.isDigit() } },
+                    label = { Text("End Episode", color = TextSecondary) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        focusedBorderColor = Violet,
+                        unfocusedBorderColor = BorderColor,
+                        cursorColor = Violet
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    var isCancelFocused by remember { mutableStateOf(false) }
+                    TextButton(
+                        onClick = onDismissRequest,
+                        modifier = Modifier
+                            .onFocusChanged { isCancelFocused = it.isFocused }
+                            .background(
+                                if (isCancelFocused) Violet.copy(alpha = 0.1f) else Color.Transparent,
+                                RoundedCornerShape(8.dp)
+                            )
+                    ) {
+                        Text("Cancel", color = if (isCancelFocused) VioletLight else TextSecondary)
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    var isApplyFocused by remember { mutableStateOf(false) }
+                    Button(
+                        onClick = {
+                            if (startEp.isNotBlank() && endEp.isNotBlank()) {
+                                onApply(startEp, endEp)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isApplyFocused) VioletLight else Violet,
+                            disabledContainerColor = CardSurface
+                        ),
+                        modifier = Modifier
+                            .onFocusChanged { isApplyFocused = it.isFocused }
+                            .border(
+                                width = if (isApplyFocused) 2.dp else 0.dp,
+                                color = if (isApplyFocused) FocusedBorder else Color.Transparent,
+                                shape = RoundedCornerShape(100.dp)
+                            ),
+                        enabled = startEp.isNotBlank() && endEp.isNotBlank()
+                    ) {
+                        Text("Apply", color = Color.White)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EpisodeRangeFilterRow(
+    totalEpisodes: Int,
+    selectedRange: Pair<String?, String?>,
+    onRangeSelected: (String?, String?) -> Unit,
+    onCustomRangeClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val ranges = remember(totalEpisodes) {
+        val list = mutableListOf<Pair<String?, String?>>()
+        list.add(null to null) // "All"
+        val chunkSize = 50
+        var start = 1
+        while (start <= totalEpisodes) {
+            val end = minOf(start + chunkSize - 1, totalEpisodes)
+            list.add(start.toString() to end.toString())
+            start += chunkSize
+        }
+        list
+    }
+
+    LazyRow(
+        modifier = modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        items(ranges) { range ->
+            val label = if (range.first == null) "All" else "${range.first} - ${range.second}"
+            val isSelected = selectedRange == range
+            RangeChip(
+                label = label,
+                isSelected = isSelected,
+                onClick = { onRangeSelected(range.first, range.second) }
+            )
+        }
+        item {
+            val isCustomActive = selectedRange.first != null && !ranges.contains(selectedRange)
+            val customLabel = if (isCustomActive) {
+                "Custom: ${selectedRange.first} - ${selectedRange.second}"
+            } else {
+                "Custom..."
+            }
+            RangeChip(
+                label = customLabel,
+                isSelected = isCustomActive,
+                onClick = onCustomRangeClick
+            )
+        }
+    }
+}
+
+@Composable
+private fun RangeChip(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    var isFocused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isFocused) 1.05f else 1f,
+        animationSpec = tween(150),
+        label = "chipScale"
+    )
+
+    val bgColor = if (isSelected) Violet else CardSurface
+    val textColor = if (isSelected) Color.White else TextPrimary
+
+    Box(
+        modifier = Modifier
+            .scale(scale)
+            .clip(RoundedCornerShape(8.dp))
+            .background(bgColor)
+            .border(
+                width = if (isFocused) 2.dp else 1.dp,
+                color = if (isFocused) FocusedBorder else if (isSelected) Color.Transparent else BorderColor,
+                shape = RoundedCornerShape(8.dp)
+            )
+            .onFocusChanged { isFocused = it.isFocused }
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            color = textColor,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
