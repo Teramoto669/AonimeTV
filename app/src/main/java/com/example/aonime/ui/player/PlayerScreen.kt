@@ -35,9 +35,11 @@ import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -355,6 +357,8 @@ private fun VideoPlayer(
 
     val focusRequester = remember { FocusRequester() }
     val playPauseFocusRequester = remember { FocusRequester() }
+    val settingsCloseFocusRequester = remember { FocusRequester() }
+    var isFirstRun by remember { mutableStateOf(true) }
 
     // Request focus to the Compose layer so D-Pad events arrive here (not stolen by PlayerView)
     LaunchedEffect(Unit) {
@@ -372,10 +376,25 @@ private fun VideoPlayer(
         }
     }
 
+    LaunchedEffect(showSettings) {
+        if (showSettings) {
+            delay(100)
+            try {
+                settingsCloseFocusRequester.requestFocus()
+            } catch (_: Exception) {}
+        } else if (!isFirstRun) {
+            try {
+                playPauseFocusRequester.requestFocus()
+            } catch (_: Exception) {}
+        } else {
+            isFirstRun = false
+        }
+    }
+
     Box(
         modifier = modifier
             .focusRequester(focusRequester)
-            .focusable()
+            .focusable(enabled = !showSettings)
             .onPreviewKeyEvent { keyEvent ->
                 if (keyEvent.type == KeyEventType.KeyDown &&
                     keyEvent.key.nativeKeyCode in dpadKeyCodes
@@ -434,6 +453,7 @@ private fun VideoPlayer(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.45f))
+                    .focusProperties { canFocus = !showSettings }
             ) {
                 // Settings button top-right
                 var isSettingsFocused by remember { mutableStateOf(false) }
@@ -618,6 +638,9 @@ private fun VideoPlayer(
 
         // Settings Modal Overlay
         if (showSettings) {
+            BackHandler(enabled = showSettings) {
+                showSettings = false
+            }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -646,7 +669,10 @@ private fun VideoPlayer(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text("Player Settings", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                            IconButton(onClick = { showSettings = false }) {
+                            IconButton(
+                                onClick = { showSettings = false },
+                                modifier = Modifier.focusRequester(settingsCloseFocusRequester)
+                            ) {
                                 Icon(Icons.Rounded.Close, contentDescription = "Close", tint = Color.White)
                             }
                         }
