@@ -46,6 +46,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.aonime.theme.BorderColor
 import com.example.aonime.theme.CardSurface
@@ -69,6 +70,7 @@ fun SearchScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showFilterDialog by remember { androidx.compose.runtime.mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
+    val isMobileLayout = LocalConfiguration.current.screenWidthDp < 600
 
     if (showFilterDialog) {
         com.example.aonime.ui.components.FilterDialog(
@@ -246,8 +248,8 @@ fun SearchScreen(
 
                     LazyVerticalGrid(
                         state = gridState,
-                        columns = GridCells.Adaptive(140.dp),
-                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
+                        columns = if (isMobileLayout) GridCells.Fixed(2) else GridCells.Adaptive(140.dp),
+                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.fillMaxSize(),

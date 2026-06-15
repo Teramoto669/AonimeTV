@@ -1,15 +1,18 @@
 package com.example.aonime
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.entryProvider
@@ -19,6 +22,7 @@ import com.example.aonime.data.AnimeDetail
 import com.example.aonime.theme.DeepBlack
 import com.example.aonime.ui.browse.BrowseScreen
 import com.example.aonime.ui.browse.BrowseViewModel
+import com.example.aonime.ui.components.BottomBar
 import com.example.aonime.ui.components.SideBar
 import com.example.aonime.ui.detail.DetailScreen
 import com.example.aonime.ui.detail.DetailViewModel
@@ -42,6 +46,11 @@ fun AonimeAppRoot() {
 
     val backStack = rememberNavBackStack(SplashNav)
 
+    // Determine layout class — COMPACT width = mobile phone portrait
+    // Phones in portrait are typically < 600dp wide
+    val configuration = LocalConfiguration.current
+    val isMobileLayout = configuration.screenWidthDp < 600
+
     // ViewModels (survive recomposition)
     val homeVm: HomeViewModel = viewModel { HomeViewModel(app.repository) }
     val searchVm: SearchViewModel = viewModel { SearchViewModel(app.repository) }
@@ -50,41 +59,15 @@ fun AonimeAppRoot() {
     val detailVm: DetailViewModel = viewModel { DetailViewModel(app.repository) }
     val playerVm: PlayerViewModel = viewModel { PlayerViewModel(app.repository) }
 
-    Row(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(DeepBlack),
-    ) {
-        // ── Left-side Sidebar ────────────────────────────────────────────────
-        val isPlayerScreen = backStack.lastOrNull() is PlayerNav
-        val isSplashScreen = backStack.lastOrNull() is SplashNav
-        if (!isPlayerScreen && !isSplashScreen) {
-            SideBar(
-                selectedIndex = selectedNavIndex,
-                onItemSelected = { index ->
-                    selectedNavIndex = index
-                    val navKey = when (index) {
-                        0 -> SearchNav
-                        1 -> HomeNav
-                        2 -> BrowseNav
-                        3 -> LibraryNav
-                        else -> HomeNav
-                    }
-                    // Pop to root and navigate
-                    while (backStack.size > 1) backStack.removeLastOrNull()
-                    if (backStack.lastOrNull() != navKey) {
-                        backStack.removeLastOrNull()
-                        backStack.add(navKey)
-                    }
-                },
-            )
-        }
+    val isPlayerScreen = backStack.lastOrNull() is PlayerNav
+    val isSplashScreen = backStack.lastOrNull() is SplashNav
+    val showNav = !isPlayerScreen && !isSplashScreen
 
-        // ── Main Content (takes remaining width) ──────────────────────────────
+    val navContent: @Composable (Modifier) -> Unit = { modifier ->
         NavDisplay(
             backStack = backStack,
             onBack = { backStack.removeLastOrNull() },
-            modifier = Modifier.weight(1f).fillMaxHeight(),
+            modifier = modifier,
             entryProvider = entryProvider {
                 entry<SplashNav> {
                     SplashScreen(
@@ -151,5 +134,52 @@ fun AonimeAppRoot() {
                 entry<Main> { HomeScreen(viewModel = homeVm, onAnimeClick = {}, onSpotlightClick = {}) }
             },
         )
+    }
+
+    val onNavSelected: (Int) -> Unit = { index ->
+        selectedNavIndex = index
+        val navKey = when (index) {
+            0 -> SearchNav
+            1 -> HomeNav
+            2 -> BrowseNav
+            3 -> LibraryNav
+            else -> HomeNav
+        }
+        // Pop to root and navigate
+        while (backStack.size > 1) backStack.removeLastOrNull()
+        if (backStack.lastOrNull() != navKey) {
+            backStack.removeLastOrNull()
+            backStack.add(navKey)
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(DeepBlack),
+    ) {
+        if (isMobileLayout) {
+            // ── Mobile Layout: BottomBar at bottom ────────────────────────────
+            Column(modifier = Modifier.fillMaxSize()) {
+                navContent(Modifier.weight(1f).fillMaxSize())
+                if (showNav) {
+                    BottomBar(
+                        selectedIndex = selectedNavIndex,
+                        onItemSelected = onNavSelected,
+                    )
+                }
+            }
+        } else {
+            // ── Large Screen Layout: SideBar on the left ──────────────────────
+            Row(modifier = Modifier.fillMaxSize()) {
+                if (showNav) {
+                    SideBar(
+                        selectedIndex = selectedNavIndex,
+                        onItemSelected = onNavSelected,
+                    )
+                }
+                navContent(Modifier.weight(1f).fillMaxHeight())
+            }
+        }
     }
 }

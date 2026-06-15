@@ -12,13 +12,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -41,10 +45,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.sp
 import com.example.aonime.R
 import com.example.aonime.theme.BorderColor
@@ -159,6 +163,106 @@ fun SideBar(
                 }
             }
         }
+    }
+}
+
+/**
+ * Bottom navigation bar for mobile/phone portrait layout.
+ * Shows nav items horizontally at the bottom of the screen.
+ */
+@Composable
+fun BottomBar(
+    selectedIndex: Int,
+    onItemSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(Color.Transparent, DarkSurface)
+                )
+            )
+            .border(
+                width = 1.dp,
+                brush = Brush.horizontalGradient(
+                    colors = listOf(Color.Transparent, BorderColor, Color.Transparent),
+                ),
+                shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+            )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(horizontal = 8.dp, vertical = 8.dp)
+                .selectableGroup(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            navItems.forEachIndexed { index, item ->
+                BottomNavItem(
+                    item = item,
+                    isSelected = selectedIndex == index,
+                    onClick = { onItemSelected(index) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BottomNavItem(
+    item: NavItem,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val bgColor by animateColorAsState(
+        targetValue = if (isSelected) Violet else Color.Transparent,
+        animationSpec = tween(200),
+        label = "bottomNavBg",
+    )
+    val iconTint by animateColorAsState(
+        targetValue = if (isSelected) Color.White else TextMuted,
+        animationSpec = tween(200),
+        label = "bottomNavIcon",
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (isSelected) 1.08f else 1f,
+        animationSpec = tween(200),
+        label = "bottomNavScale",
+    )
+
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .background(bgColor)
+            .clickable(
+                indication = null,
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                onClick = onClick,
+            )
+            .padding(horizontal = 20.dp, vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            imageVector = item.icon,
+            contentDescription = item.label,
+            tint = iconTint,
+            modifier = Modifier.size(24.dp),
+        )
+        Spacer(Modifier.height(3.dp))
+        Text(
+            text = item.label,
+            color = if (isSelected) Color.White else TextSecondary,
+            fontSize = 10.sp,
+            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+            maxLines = 1,
+        )
     }
 }
 

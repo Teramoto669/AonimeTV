@@ -2,6 +2,7 @@
 package com.example.aonime.ui.player
 
 import android.net.Uri
+import android.content.pm.ActivityInfo
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.annotation.OptIn
@@ -82,6 +83,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+
+
 @OptIn(UnstableApi::class)
 @Composable
 fun PlayerScreen(
@@ -92,6 +95,18 @@ fun PlayerScreen(
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // ── Lock orientation to landscape when entering the player ──────────────
+    val activity = LocalContext.current as? android.app.Activity
+    DisposableEffect(Unit) {
+        val original = activity?.requestedOrientation
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        onDispose {
+            activity?.requestedOrientation =
+                original ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     LaunchedEffect(slug, ep) { viewModel.load(slug, ep) }
 
@@ -164,6 +179,10 @@ private fun VideoPlayer(
     var duration by remember { mutableLongStateOf(0L) }
     var isDragging by remember { mutableStateOf(false) }
     var resetTimerTrigger by remember { mutableLongStateOf(0L) }
+
+    // Double-tap skip feedback
+    var doubleTapSide by remember { mutableStateOf<String?>(null) } // "left" | "right"
+    var doubleTapCount by remember { mutableIntStateOf(0) }
 
     fun resetHideTimer() {
         resetTimerTrigger = System.currentTimeMillis()
@@ -431,16 +450,40 @@ private fun VideoPlayer(
             modifier = Modifier.fillMaxSize(),
         )
 
-        // Tap anywhere to show/hide controller
+        // Tap anywhere to show/hide controller + double-tap left/right to skip
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .pointerInput(Unit) {
-                    detectTapGestures(onTap = {
-                        isControllerVisible = !isControllerVisible
-                    })
+                    detectTapGestures(
+                        onTap = {
+                            isControllerVisible = !isControllerVisible
+                        },
+                        onDoubleTap = { offset ->
+                            val isLeftSide = offset.x < size.width / 2f
+                            if (isLeftSide) {
+                                exoPlayer.seekTo((exoPlayer.currentPosition - 10_000L).coerceAtLeast(0L))
+                                doubleTapSide = "left"
+                            } else {
+                                exoPlayer.seekTo(exoPlayer.currentPosition + 10_000L)
+                                doubleTapSide = "right"
+                            }
+                            doubleTapCount++
+                            resetHideTimer()
+                        }
+                    )
                 }
         )
+
+        // Double-tap skip visual feedback
+        doubleTapSide?.let { side ->
+            DoubleTapFeedback(
+                side = side,
+                tapCount = doubleTapCount,
+                onDismiss = { doubleTapSide = null },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
         // Custom Compose Controller Overlay
         AnimatedVisibility(
@@ -768,6 +811,77 @@ private fun VideoPlayer(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Animated overlay shown when user double-taps left or right side to skip.
+ * Shows a ripple + directional arrow icon + skip label.
+ */
+@Composable
+private fun DoubleTapFeedback(
+    side: String,
+    tapCount: Int,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var visible by remember { mutableStateOf(false) }
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(durationMillis = if (visible) 120 else 350),
+        label = "doubleTapAlpha",
+        finishedListener = { if (!visible) onDismiss() }
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (visible) 1f else 0.75f,
+        animationSpec = tween(durationMillis = if (visible) 120 else 300),
+        label = "doubleTapScale"
+    )
+
+    LaunchedEffect(tapCount) {
+        visible = true
+        delay(700)
+        visible = false
+    }
+
+    val isLeft = side == "left"
+    val alignment = if (isLeft) Alignment.CenterStart else Alignment.CenterEnd
+    val icon = if (isLeft) Icons.Rounded.FastRewind else Icons.Rounded.FastForward
+    val label = if (isLeft) "-10s" else "+10s"
+
+    Box(modifier = modifier, contentAlignment = alignment) {
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(0.28f)
+                .graphicsLayer { this.alpha = alpha; scaleX = scale; scaleY = scale }
+                .background(
+                    color = Color.White.copy(alpha = 0.12f),
+                    shape = if (isLeft)
+                        RoundedCornerShape(topEnd = 120.dp, bottomEnd = 120.dp)
+                    else
+                        RoundedCornerShape(topStart = 120.dp, bottomStart = 120.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(40.dp)
+                )
+                Text(
+                    text = label,
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
