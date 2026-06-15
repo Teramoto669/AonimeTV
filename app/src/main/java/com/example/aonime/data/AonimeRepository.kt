@@ -20,13 +20,13 @@ class AonimeRepository(
     // ─── Filter ──────────────────────────────────────────────────────────────
     suspend fun filterAnime(
         keyword: String? = null,
-        genre: String? = null,
+        genre: List<String>? = null,
         season: String? = null,
         year: String? = null,
         termType: String? = null,
         status: String? = null,
         language: String? = null,
-        rating: String? = null,
+        rating: List<String>? = null,
         sort: String? = null,
         page: Int? = null,
     ): Result<FilterResult> = runCatching {

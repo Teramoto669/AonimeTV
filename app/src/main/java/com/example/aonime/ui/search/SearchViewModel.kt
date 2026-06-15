@@ -94,20 +94,20 @@ class SearchViewModel(private val repository: AonimeRepository) : ViewModel() {
 
             repository.filterAnime(
                 keyword = q.takeIf { it.isNotBlank() },
-                genre = state.genre.joinToString(",").takeIf { it.isNotBlank() },
+                genre = state.genre.takeIf { it.isNotEmpty() },
                 season = state.season,
                 year = state.year,
                 termType = state.termType,
                 status = state.status,
                 language = state.language,
-                rating = state.rating.joinToString(",").takeIf { it.isNotBlank() },
+                rating = state.rating.takeIf { it.isNotEmpty() },
                 sort = state.sort,
                 page = page
             ).fold(
                 onSuccess = { result ->
                     val newItems = result.results ?: emptyList()
                     currentItems.addAll(newItems)
-                    hasNext = newItems.isNotEmpty()
+                    hasNext = (result.hasNextPage ?: true) && newItems.isNotEmpty()
                     _uiState.value = SearchUiState.Success(
                         results = currentItems.toList(),
                         total = 0, // Using 0 because FilterResult doesn't return totalResults
@@ -117,6 +117,13 @@ class SearchViewModel(private val repository: AonimeRepository) : ViewModel() {
                 onFailure = { 
                     if (page == 1) {
                         _uiState.value = SearchUiState.Error(it.message ?: "Search failed") 
+                    } else {
+                        hasNext = false
+                        _uiState.value = SearchUiState.Success(
+                            results = currentItems.toList(),
+                            total = 0,
+                            hasNextPage = hasNext,
+                        )
                     }
                 },
             )

@@ -57,13 +57,13 @@ class BrowseViewModel(private val repository: AonimeRepository) : ViewModel() {
             
             val result = repository.filterAnime(
                 keyword = currentFilter.keyword?.takeIf { it.isNotBlank() },
-                genre = currentFilter.genre.joinToString(",").takeIf { it.isNotBlank() },
+                genre = currentFilter.genre.takeIf { it.isNotEmpty() },
                 season = currentFilter.season,
                 year = currentFilter.year,
                 termType = currentFilter.termType,
                 status = currentFilter.status,
                 language = currentFilter.language,
-                rating = currentFilter.rating.joinToString(",").takeIf { it.isNotBlank() },
+                rating = currentFilter.rating.takeIf { it.isNotEmpty() },
                 sort = currentFilter.sort ?: "latest-updated",
                 page = page
             )
@@ -72,12 +72,15 @@ class BrowseViewModel(private val repository: AonimeRepository) : ViewModel() {
                 onSuccess = { filterResult ->
                     val newItems = filterResult.results ?: emptyList()
                     currentItems.addAll(newItems)
-                    hasNext = newItems.isNotEmpty() // Rely on items presence instead of API's hasNextPage field
+                    hasNext = (filterResult.hasNextPage ?: true) && newItems.isNotEmpty()
                     _uiState.value = BrowseUiState.Success(currentItems.toList(), hasNext)
                 },
                 onFailure = { 
                     if (page == 1) {
                         _uiState.value = BrowseUiState.Error(it.message ?: "Failed to load") 
+                    } else {
+                        hasNext = false
+                        _uiState.value = BrowseUiState.Success(currentItems.toList(), hasNext)
                     }
                 }
             )

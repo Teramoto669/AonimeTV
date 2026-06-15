@@ -23,13 +23,13 @@ interface ApiService {
     @GET("filter")
     suspend fun filterAnime(
         @Query("keyword") keyword: String? = null,
-        @Query("genre[]") genre: String? = null,
+        @Query("genre[]") genre: List<String>? = null,
         @Query("season[]") season: String? = null,
         @Query("year[]") year: String? = null,
         @Query("term_type[]") termType: String? = null,
         @Query("status[]") status: String? = null,
         @Query("language[]") language: String? = null,
-        @Query("rating[]") rating: String? = null,
+        @Query("rating[]") rating: List<String>? = null,
         @Query("sort") sort: String? = null,
         @Query("page") page: Int? = null,
     ): ApiResponse<FilterResult>
