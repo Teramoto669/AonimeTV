@@ -83,6 +83,7 @@ interface ApiService {
     suspend fun watchEpisode(
         @Path("slug") slug: String,
         @Query("ep") ep: String,
+        @Query("stream") stream: Boolean = false,
     ): WatchApiResponse
 
     // ─── Schedule ────────────────────────────────────────────────────────────

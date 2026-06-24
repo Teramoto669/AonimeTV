@@ -120,6 +120,9 @@ fun AonimeAppRoot() {
                         onPlayEpisode = { slug, ep ->
                             backStack.add(PlayerNav(slug = slug, ep = ep))
                         },
+                        onAnimeClick = { relatedSlug ->
+                            backStack.add(DetailNav(slug = relatedSlug))
+                        },
                     )
                 }
                 entry<PlayerNav> { key ->

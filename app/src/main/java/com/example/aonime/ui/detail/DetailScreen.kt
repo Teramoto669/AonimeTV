@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -56,6 +57,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.example.aonime.data.AnimeDetail
 import com.example.aonime.data.Episode
+import com.example.aonime.data.RelatedAnime
+import androidx.compose.ui.graphics.graphicsLayer
 import com.example.aonime.theme.CardSurface
 import com.example.aonime.theme.DeepBlack
 import com.example.aonime.theme.FocusedBorder
@@ -80,6 +83,7 @@ fun DetailScreen(
     viewModel: DetailViewModel,
     onBack: () -> Unit,
     onPlayEpisode: (String, String) -> Unit,
+    onAnimeClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -120,6 +124,7 @@ fun DetailScreen(
                     onToggleFavorite = { viewModel.toggleFavorite(slug, state.detail) },
                     onPlayEpisode = { ep -> onPlayEpisode(slug, ep) },
                     onRangeSelected = { start, end -> viewModel.setEpisodeRange(slug, start, end) },
+                    onAnimeClick = onAnimeClick,
                 )
             }
         }
@@ -146,6 +151,7 @@ private fun DetailContent(
     onToggleFavorite: () -> Unit,
     onPlayEpisode: (String) -> Unit,
     onRangeSelected: (String?, String?) -> Unit,
+    onAnimeClick: (String) -> Unit,
 ) {
     var showCustomRangeDialog by remember { mutableStateOf(false) }
 
@@ -286,7 +292,42 @@ private fun DetailContent(
                     Text(detail.studios.joinToString(", "), color = TextSecondary, fontSize = 13.sp)
                     Spacer(Modifier.height(16.dp))
                 }
+            }
+        }
 
+        // Related Series section
+        val relatedList = detail.related ?: emptyList()
+        if (relatedList.isNotEmpty()) {
+            item {
+                Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
+                    Text(
+                        "Related Series",
+                        color = TextPrimary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(items = relatedList, key = { it.slug ?: it.hashCode() }) { related ->
+                        RelatedAnimeCardItem(
+                            related = related,
+                            onClick = { related.slug?.let { onAnimeClick(it) } }
+                        )
+                    }
+                }
+                Spacer(Modifier.height(24.dp))
+            }
+        }
+
+        // Episode header section
+        item {
+            Column(modifier = Modifier.padding(horizontal = 24.dp)) {
                 // Episode section header
                 Text(
                     "Episodes (${totalEpisodes})",
@@ -366,7 +407,7 @@ private fun EpisodeItem(
             .clip(RoundedCornerShape(10.dp))
             .background(if (isFocused) Violet.copy(alpha = 0.2f) else CardSurface)
             .border(
-                width = if (isFocused) 2.dp else 0.dp,
+                width = 2.dp,
                 color = if (isFocused) FocusedBorder else Color.Transparent,
                 shape = RoundedCornerShape(10.dp)
             )
@@ -520,7 +561,7 @@ fun CustomEpisodeRangeDialog(
                         modifier = Modifier
                             .onFocusChanged { isApplyFocused = it.isFocused }
                             .border(
-                                width = if (isApplyFocused) 2.dp else 0.dp,
+                                width = 2.dp,
                                 color = if (isApplyFocused) FocusedBorder else Color.Transparent,
                                 shape = RoundedCornerShape(100.dp)
                             ),
@@ -623,5 +664,88 @@ private fun RangeChip(
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium
         )
+    }
+}
+
+@Composable
+private fun RelatedAnimeCardItem(
+    related: RelatedAnime,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var isFocused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isFocused) 1.05f else 1f,
+        animationSpec = tween(150),
+        label = "relatedCardScale",
+    )
+
+    Column(
+        modifier = modifier
+            .width(140.dp)
+            .onFocusChanged { isFocused = it.isFocused }
+            .clickable(
+                indication = null,
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                onClick = onClick,
+            )
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(RoundedCornerShape(12.dp))
+            .background(CardSurface)
+            .border(
+                width = 2.dp,
+                color = if (isFocused) FocusedBorder else Color.Transparent,
+                shape = RoundedCornerShape(12.dp),
+            ),
+    ) {
+        // Poster Image
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(2f / 3f)
+                .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
+        ) {
+            AsyncImage(
+                model = related.image,
+                contentDescription = related.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            // Relation badge (e.g. Sequel, Prequel)
+            if (!related.relation.isNullOrBlank()) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(6.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Violet.copy(alpha = 0.9f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                ) {
+                    Text(
+                        text = related.relation,
+                        color = Color.White,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+        }
+
+        // Info
+        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
+            Text(
+                text = related.title ?: "",
+                color = TextPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                minLines = 2,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                lineHeight = 16.sp,
+            )
+        }
     }
 }

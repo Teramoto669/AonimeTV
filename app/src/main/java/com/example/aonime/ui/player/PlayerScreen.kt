@@ -2,6 +2,7 @@
 package com.example.aonime.ui.player
 
 import android.net.Uri
+import android.content.Context
 import android.content.pm.ActivityInfo
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -150,6 +151,7 @@ fun PlayerScreen(
                     availableSources = state.availableSources,
                     activeSource = state.activeSource,
                     onServerSelected = { viewModel.selectSource(it) },
+                    episodeNumber = ep,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -165,6 +167,7 @@ private fun VideoPlayer(
     availableSources: List<com.example.aonime.data.WatchSource>,
     activeSource: com.example.aonime.data.WatchSource?,
     onServerSelected: (com.example.aonime.data.WatchSource) -> Unit,
+    episodeNumber: String,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -188,18 +191,24 @@ private fun VideoPlayer(
         resetTimerTrigger = System.currentTimeMillis()
     }
 
+    val sharedPrefs = remember(context) {
+        context.getSharedPreferences("player_settings", Context.MODE_PRIVATE)
+    }
+
     // Settings States
-    var subSizeScale by remember { mutableFloatStateOf(1.0f) }
+    var subSizeScale by remember { mutableFloatStateOf(sharedPrefs.getFloat("sub_size_scale", 1.0f)) }
     var subDelaySec by remember { mutableFloatStateOf(0f) }
-    var subColor by remember { mutableStateOf(android.graphics.Color.WHITE) }
-    var edgeStyle by remember { mutableStateOf(CaptionStyleCompat.EDGE_TYPE_OUTLINE) }
+    var subColor by remember { mutableStateOf(sharedPrefs.getInt("sub_color", android.graphics.Color.WHITE)) }
+    var edgeStyle by remember { mutableStateOf(sharedPrefs.getInt("edge_style", CaptionStyleCompat.EDGE_TYPE_OUTLINE)) }
     var selectedSubIdx by remember { mutableIntStateOf(if (subtitles.isNotEmpty()) 0 else -1) }
     var selectedQualityHeight by remember { mutableStateOf<Int?>(null) }
+    var isFirstQualityApply by remember { mutableStateOf(true) }
     var isPlayerViewReady by remember { mutableStateOf(false) }
 
     LaunchedEffect(streamUrl) {
         selectedSubIdx = if (subtitles.isNotEmpty()) 0 else -1
         subDelaySec = 0f
+        isFirstQualityApply = true
     }
 
     val exoPlayer = remember {
@@ -332,6 +341,20 @@ private fun VideoPlayer(
                         }
                     }
                 }
+            }
+        }
+
+        if (isFirstQualityApply) {
+            isFirstQualityApply = false
+        } else {
+            val isVidplay = activeSource?.server?.lowercase()?.let {
+                it.contains("vidplay") || it.contains("vidstream") || it.contains("vid-")
+            } ?: false
+
+            if (!isVidplay) {
+                val pos = exoPlayer.currentPosition.coerceAtLeast(0L)
+                exoPlayer.seekTo(pos)
+                exoPlayer.prepare()
             }
         }
     }
@@ -498,6 +521,22 @@ private fun VideoPlayer(
                     .background(Color.Black.copy(alpha = 0.45f))
                     .focusProperties { canFocus = !showSettings }
             ) {
+                // Episode number top-left
+                val displayEp = if (episodeNumber.contains("Episode", ignoreCase = true)) {
+                    episodeNumber
+                } else {
+                    "Episode $episodeNumber"
+                }
+                Text(
+                    text = displayEp,
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(16.dp)
+                )
+
                 // Settings button top-right
                 var isSettingsFocused by remember { mutableStateOf(false) }
                 ControllerIconButton(
@@ -783,7 +822,10 @@ private fun VideoPlayer(
                             Text("Subtitle Size: ${(subSizeScale * 100).roundToInt()}%", color = Violet, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 listOf(0.75f, 1.0f, 1.25f, 1.5f).forEach { scale ->
-                                    QualityButton("${(scale * 100).roundToInt()}%", subSizeScale == scale) { subSizeScale = scale }
+                                    QualityButton("${(scale * 100).roundToInt()}%", subSizeScale == scale) {
+                                        subSizeScale = scale
+                                        sharedPrefs.edit().putFloat("sub_size_scale", scale).apply()
+                                    }
                                 }
                             }
 
@@ -792,10 +834,22 @@ private fun VideoPlayer(
                             // Text Color
                             Text("Text Color", color = Violet, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                ColorButton(android.graphics.Color.WHITE, subColor == android.graphics.Color.WHITE) { subColor = android.graphics.Color.WHITE }
-                                ColorButton(android.graphics.Color.YELLOW, subColor == android.graphics.Color.YELLOW) { subColor = android.graphics.Color.YELLOW }
-                                ColorButton(android.graphics.Color.CYAN, subColor == android.graphics.Color.CYAN) { subColor = android.graphics.Color.CYAN }
-                                ColorButton(android.graphics.Color.GREEN, subColor == android.graphics.Color.GREEN) { subColor = android.graphics.Color.GREEN }
+                                ColorButton(android.graphics.Color.WHITE, subColor == android.graphics.Color.WHITE) {
+                                    subColor = android.graphics.Color.WHITE
+                                    sharedPrefs.edit().putInt("sub_color", android.graphics.Color.WHITE).apply()
+                                }
+                                ColorButton(android.graphics.Color.YELLOW, subColor == android.graphics.Color.YELLOW) {
+                                    subColor = android.graphics.Color.YELLOW
+                                    sharedPrefs.edit().putInt("sub_color", android.graphics.Color.YELLOW).apply()
+                                }
+                                ColorButton(android.graphics.Color.CYAN, subColor == android.graphics.Color.CYAN) {
+                                    subColor = android.graphics.Color.CYAN
+                                    sharedPrefs.edit().putInt("sub_color", android.graphics.Color.CYAN).apply()
+                                }
+                                ColorButton(android.graphics.Color.GREEN, subColor == android.graphics.Color.GREEN) {
+                                    subColor = android.graphics.Color.GREEN
+                                    sharedPrefs.edit().putInt("sub_color", android.graphics.Color.GREEN).apply()
+                                }
                             }
 
                             Spacer(modifier = Modifier.height(24.dp))
@@ -803,10 +857,22 @@ private fun VideoPlayer(
                             // Edge Style
                             Text("Edge Style", color = Violet, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                QualityButton("None", edgeStyle == CaptionStyleCompat.EDGE_TYPE_NONE) { edgeStyle = CaptionStyleCompat.EDGE_TYPE_NONE }
-                                QualityButton("Outline", edgeStyle == CaptionStyleCompat.EDGE_TYPE_OUTLINE) { edgeStyle = CaptionStyleCompat.EDGE_TYPE_OUTLINE }
-                                QualityButton("Drop Shadow", edgeStyle == CaptionStyleCompat.EDGE_TYPE_DROP_SHADOW) { edgeStyle = CaptionStyleCompat.EDGE_TYPE_DROP_SHADOW }
-                                QualityButton("Raised", edgeStyle == CaptionStyleCompat.EDGE_TYPE_RAISED) { edgeStyle = CaptionStyleCompat.EDGE_TYPE_RAISED }
+                                QualityButton("None", edgeStyle == CaptionStyleCompat.EDGE_TYPE_NONE) {
+                                    edgeStyle = CaptionStyleCompat.EDGE_TYPE_NONE
+                                    sharedPrefs.edit().putInt("edge_style", CaptionStyleCompat.EDGE_TYPE_NONE).apply()
+                                }
+                                QualityButton("Outline", edgeStyle == CaptionStyleCompat.EDGE_TYPE_OUTLINE) {
+                                    edgeStyle = CaptionStyleCompat.EDGE_TYPE_OUTLINE
+                                    sharedPrefs.edit().putInt("edge_style", CaptionStyleCompat.EDGE_TYPE_OUTLINE).apply()
+                                }
+                                QualityButton("Drop Shadow", edgeStyle == CaptionStyleCompat.EDGE_TYPE_DROP_SHADOW) {
+                                    edgeStyle = CaptionStyleCompat.EDGE_TYPE_DROP_SHADOW
+                                    sharedPrefs.edit().putInt("edge_style", CaptionStyleCompat.EDGE_TYPE_DROP_SHADOW).apply()
+                                }
+                                QualityButton("Raised", edgeStyle == CaptionStyleCompat.EDGE_TYPE_RAISED) {
+                                    edgeStyle = CaptionStyleCompat.EDGE_TYPE_RAISED
+                                    sharedPrefs.edit().putInt("edge_style", CaptionStyleCompat.EDGE_TYPE_RAISED).apply()
+                                }
                             }
                         }
                     }
@@ -935,7 +1001,7 @@ private fun ControllerIconButton(
                 }
             )
             .border(
-                width = if (isFocused) 2.dp else 0.dp,
+                width = 2.dp,
                 color = if (isFocused) VioletLight else Color.Transparent,
                 shape = CircleShape
             )
@@ -994,7 +1060,7 @@ private fun QualityButton(text: String, isSelected: Boolean, onClick: () -> Unit
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .onFocusChanged { isFocused = it.isFocused }
             .border(
-                width = if (isFocused) 2.dp else 0.dp,
+                width = 2.dp,
                 color = if (isFocused) com.example.aonime.theme.FocusedBorder else Color.Transparent,
                 shape = RoundedCornerShape(8.dp)
             ),
@@ -1022,7 +1088,7 @@ private fun ColorButton(colorInt: Int, isSelected: Boolean, onClick: () -> Unit)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .background(Color(colorInt), RoundedCornerShape(20.dp))
             .border(
-                width = if (isFocused) 2.dp else 0.dp,
+                width = 2.dp,
                 color = if (isFocused) com.example.aonime.theme.FocusedBorder else Color.Transparent,
                 shape = RoundedCornerShape(20.dp)
             )

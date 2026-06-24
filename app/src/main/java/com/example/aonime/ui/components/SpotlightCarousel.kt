@@ -236,7 +236,7 @@ private fun SpotlightItem(
                     .clip(RoundedCornerShape(12.dp))
                     .background(Brush.linearGradient(listOf(Violet, VioletLight)))
                     .border(
-                        width = if (isItemFocused) 2.dp else 0.dp,
+                        width = 2.dp,
                         color = if (isItemFocused) FocusedBorder else Color.Transparent,
                         shape = RoundedCornerShape(12.dp)
                     )

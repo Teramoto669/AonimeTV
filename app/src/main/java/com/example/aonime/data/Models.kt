@@ -69,6 +69,17 @@ data class AnimeDetail(
     val producers: List<String>? = null,
     val watchUrl: String? = null,
     val episodes: EpisodeListData? = null,
+    val related: List<RelatedAnime>? = null,
+)
+
+data class RelatedAnime(
+    val id: String? = null,
+    val title: String? = null,
+    val titleJp: String? = null,
+    val image: String? = null,
+    val relation: String? = null,
+    val href: String? = null,
+    val slug: String? = null,
 )
 
 // ─── Episode ──────────────────────────────────────────────────────────────────

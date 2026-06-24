@@ -101,7 +101,7 @@ fun BrowseScreen(
                     .clip(RoundedCornerShape(8.dp))
                     .background(if (isFilterFocused) Violet.copy(alpha=0.2f) else CardSurface)
                     .border(
-                        width = if (isFilterFocused) 2.dp else 0.dp, 
+                        width = 2.dp, 
                         color = if (isFilterFocused) com.example.aonime.theme.FocusedBorder else Color.Transparent, 
                         shape = RoundedCornerShape(8.dp)
                     )

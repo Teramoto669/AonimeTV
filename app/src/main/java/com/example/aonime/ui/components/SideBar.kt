@@ -35,7 +35,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -80,86 +80,94 @@ fun SideBar(
     onItemSelected: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var isSidebarFocused by remember { mutableIntStateOf(-1) }
+    var isSidebarFocused by remember { mutableStateOf(false) }
     val sidebarWidth by animateDpAsState(
-        targetValue = if (isSidebarFocused >= 0) 84.dp else 72.dp,
+        targetValue = if (isSidebarFocused) 84.dp else 72.dp,
         animationSpec = tween(durationMillis = 250),
         label = "sidebarWidth",
     )
 
+    // Outer Box has a fixed width of 72.dp to prevent triggering parent/sibling relayout.
+    // The inner Box expands to `sidebarWidth` (84.dp when focused) and overlays the content.
     Box(
         modifier = modifier
-            .width(sidebarWidth)
+            .width(72.dp)
             .fillMaxHeight()
-            .background(
-                brush = Brush.horizontalGradient(
-                    colors = listOf(Color.Transparent, DarkSurface),
-                )
-            )
-            .border(
-                width = 1.dp,
-                brush = Brush.verticalGradient(
-                    colors = listOf(Color.Transparent, BorderColor, Color.Transparent),
-                ),
-                shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp),
-            ),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight()
-                .padding(vertical = 32.dp, horizontal = 8.dp)
-                .selectableGroup(),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            // Logo / App Name at top
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(bottom = 32.dp),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            brush = Brush.linearGradient(listOf(Violet, VioletLight))
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.logo),
-                        contentDescription = "Aonime Logo",
-                        modifier = Modifier.padding(8.dp)
-                    )
-                }
-                if (isSidebarFocused >= 0) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = "AONIME",
-                        color = VioletLight,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 11.sp,
-                        letterSpacing = 1.sp,
-                        maxLines = 1,
-                        softWrap = false,
-                    )
-                }
+            .onFocusChanged { state ->
+                isSidebarFocused = state.hasFocus
             }
-
-            // Nav Items
-            navItems.forEachIndexed { index, item ->
-                NavRailItem(
-                    item = item,
-                    isSelected = selectedIndex == index,
-                    showLabel = isSidebarFocused >= 0,
-                    onFocusChanged = { focused ->
-                        isSidebarFocused = if (focused) index else -1
-                    },
-                    onClick = { onItemSelected(index) },
+    ) {
+        Box(
+            modifier = Modifier
+                .width(sidebarWidth)
+                .fillMaxHeight()
+                .background(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(Color.Transparent, DarkSurface),
+                    )
                 )
-                if (index < navItems.lastIndex) {
-                    Spacer(Modifier.height(8.dp))
+                .border(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, BorderColor, Color.Transparent),
+                    ),
+                    shape = RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp),
+                ),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight()
+                    .padding(vertical = 32.dp, horizontal = 8.dp)
+                    .selectableGroup(),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                // Logo / App Name at top
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(bottom = 32.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                brush = Brush.linearGradient(listOf(Violet, VioletLight))
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.logo),
+                            contentDescription = "Aonime Logo",
+                            modifier = Modifier.padding(8.dp)
+                        )
+                    }
+                    if (isSidebarFocused) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = "AONIME",
+                            color = VioletLight,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 11.sp,
+                            letterSpacing = 1.sp,
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                    }
+                }
+
+                // Nav Items
+                navItems.forEachIndexed { index, item ->
+                    NavRailItem(
+                        item = item,
+                        isSelected = selectedIndex == index,
+                        showLabel = isSidebarFocused,
+                        onClick = { onItemSelected(index) },
+                    )
+                    if (index < navItems.lastIndex) {
+                        Spacer(Modifier.height(8.dp))
+                    }
                 }
             }
         }
@@ -271,15 +279,14 @@ private fun NavRailItem(
     item: NavItem,
     isSelected: Boolean,
     showLabel: Boolean,
-    onFocusChanged: (Boolean) -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var isFocused by remember { mutableIntStateOf(0) }
+    var isFocused by remember { mutableStateOf(false) }
     val bgColor by animateColorAsState(
         targetValue = when {
             isSelected -> Violet
-            isFocused > 0 -> VioletGlow
+            isFocused -> VioletGlow
             else -> Color.Transparent
         },
         animationSpec = tween(200),
@@ -288,7 +295,7 @@ private fun NavRailItem(
     val iconTint by animateColorAsState(
         targetValue = when {
             isSelected -> Color.White
-            isFocused > 0 -> VioletLight
+            isFocused -> VioletLight
             else -> TextMuted
         },
         animationSpec = tween(200),
@@ -300,8 +307,7 @@ private fun NavRailItem(
             .clip(RoundedCornerShape(12.dp))
             .background(bgColor)
             .onFocusChanged { state ->
-                isFocused = if (state.isFocused) 1 else 0
-                onFocusChanged(state.isFocused)
+                isFocused = state.isFocused
             }
             .clickable(
                 indication = null,

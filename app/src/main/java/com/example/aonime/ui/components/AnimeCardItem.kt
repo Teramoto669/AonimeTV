@@ -74,7 +74,7 @@ fun AnimeCardItem(
             .clip(RoundedCornerShape(12.dp))
             .background(CardSurface)
             .border(
-                width = if (isFocused) 2.dp else 0.dp,
+                width = 2.dp,
                 color = if (isFocused) FocusedBorder else Color.Transparent,
                 shape = RoundedCornerShape(12.dp),
             ),

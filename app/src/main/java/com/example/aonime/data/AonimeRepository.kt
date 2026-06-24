@@ -65,7 +65,7 @@ class AonimeRepository(
 
     // ─── Watch ───────────────────────────────────────────────────────────────
     suspend fun watchEpisode(slug: String, ep: String): Result<Map<String, Any?>> = runCatching {
-        api.watchEpisode(slug, ep).data ?: error("No data")
+        api.watchEpisode(slug, ep, stream = false).data ?: error("No data")
     }
 
     // ─── Favorites (Room) ────────────────────────────────────────────────────
